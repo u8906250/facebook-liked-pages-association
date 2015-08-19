@@ -2,6 +2,17 @@ var express = require('express.io');
 var graph = require('fbgraph');
 var	conf = require("../config").facebook;
 
+//get your access token from https://developers.facebook.com/tools/explorer
+if (conf.access_token) {
+	graph.setAccessToken(conf.access_token);
+	graph.get("Official.YellowBook/likes", function(err, res) {
+		console.log(res);
+	});
+	//TODO acccess token will expire in hours, to keep alive by get https://graph.facebook.com/me?access_token=xxxxx
+}
+
+
+/*
 var app = express().http().io();
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -42,3 +53,4 @@ app.get('/UserHasLoggedIn', function(req, res) {
 });
 
 app.listen(7076);
+*/
