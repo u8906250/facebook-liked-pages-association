@@ -1,0 +1,15 @@
+{
+  "name": "facebook-liked-pages-association",
+  "version": "0.0.1",
+  "description": "facebook-liked-pages-association",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/u8906250/facebook-liked-pages-association.git"
+  },
+  "dependencies": {
+    "express.io": "1.1.13",
+	"fbgraph":"1.0.0",
+	"ejs":"2.3.3"
+  },
+  "main": "src/app.js"
+}
