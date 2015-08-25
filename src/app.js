@@ -1,6 +1,6 @@
 var express = require('express.io');
 var graph = require('fbgraph');
-var conf = require("../config").facebook;
+var conf = require("../config").facebook; //setup your own config.js
 var MAX_LIKED_PAGES = 65535;
 
 function liked_pages_bucket_get (start, end, liked_pages, id)
@@ -20,21 +20,17 @@ function liked_pages_dump (liked_pages)
 {
 	for (i=0; i<MAX_LIKED_PAGES; i++) {
 		if (typeof liked_pages[i] != "undefined"){
-			console.log(i + " " + liked_pages[i].id + " " + liked_pages[i].name + " " + liked_pages[i].count);
+			if (liked_pages[i].count > 10) {
+				console.log(i + " " + liked_pages[i].id + " " + liked_pages[i].name + " " + liked_pages[i].count);
+			}
 		}
 	}
 }
 
-//get your access token from https://developers.facebook.com/tools/explorer
-if (conf.access_token) {
-	graph.setAccessToken(conf.access_token);
-	var start_page = "Official.YellowBook";
-	var liked_pages = new Array(MAX_LIKED_PAGES);
-	graph.get(start_page, function(err, res) {
-		if (res.id && res.name) {
-			liked_pages[res.id%MAX_LIKED_PAGES] = {"id":res.id, "name":res.name, "count":1};
-		}
-		graph.get(start_page+"/likes", function(err, res) {
+function liked_pages_get (liked_pages, name)
+{
+	graph.get(name+"/likes", function(err, res) {
+		if (res && res.data) { 
 			res.data.forEach(function(entry) {
 				if (entry.id && entry.name) {
 					idx = liked_pages_bucket_get (entry.id%MAX_LIKED_PAGES, MAX_LIKED_PAGES, entry.id);
@@ -47,56 +43,49 @@ if (conf.access_token) {
 					}
 					if (typeof liked_pages[idx] == "undefined"){
 						liked_pages[idx] = {"id":entry.id, "name":entry.name, "count":1};
+						liked_pages_get(liked_pages, entry.id);
 					} else {
 						liked_pages[idx].count ++;
 					}
 				}
 			});
-			liked_pages_dump(liked_pages);
-		});
+		}
+	});
+}
+
+//get your access token from https://developers.facebook.com/tools/explorer
+if (conf.access_token) {
+	graph.setAccessToken(conf.access_token);
+	var start_name = "thinkTW";
+	var liked_pages = new Array(MAX_LIKED_PAGES);
+	graph.get(start_name, function(err, res) {
+		if (res.id && res.name) {
+			liked_pages[res.id%MAX_LIKED_PAGES] = {"id":res.id, "name":res.name, "count":1};
+			liked_pages_get(liked_pages, start_name);
+		}
 	});
 	//TODO acccess token will expire in hours, to keep alive by get https://graph.facebook.com/me?access_token=xxxxx
 }
 
-/*
+
 var app = express().http().io();
-app.set('views', __dirname + '/views');
-app.set('view engine', 'ejs');
+
+app.use(express.cookieParser())
+app.use(express.session({secret: 'test123'}))
+
+app.io.route('ready', function(req) {
+});
+
+app.io.route('liked_pages', function(req) {
+	liked_pages_dump(liked_pages);
+	//req.io.emit('talk', {liked_pages: liked_pages});
+});
 
 app.get('/', function(req, res) {
-	res.render('index');
-});
-app.get('/auth/facebook', function(req, res) {
-	if (!req.query.code) {
-		var authUrl = graph.getOauthUrl({
-			"client_id":     conf.client_id,
-			"redirect_uri":  conf.redirect_uri,
-			"scope":         conf.scope
-		});
-
-		if (!req.query.error) {
-			res.redirect(authUrl);
-		} else {
-			res.send('access denied');
-		}
-		return;
+	if (req.session.loginDate === undefined) {
+		req.session.loginDate = new Date().toString();
 	}
-	graph.authorize({
-		"client_id":      conf.client_id,
-		"redirect_uri":   conf.redirect_uri,
-		"client_secret":  conf.client_secret,
-		"code":           req.query.code
-	}, function (err, facebookRes) {
-		res.redirect('/UserHasLoggedIn');
-	});
-});
-app.get('/UserHasLoggedIn', function(req, res) {
-	res.render("index");
-	//FIXME manual test Official.YellowBook liked pages
-	graph.get("Official.YellowBook/likes", function(err, res) {
-		console.log(res);
-	});
-});
+	res.sendfile(__dirname + '/views/client.html')
+})
 
-app.listen(7076);
-*/
+app.listen(7076)

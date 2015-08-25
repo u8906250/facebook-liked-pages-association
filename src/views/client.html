@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<head><meta charset='UTF-8'>
+</head><body>
+
+
+<div id="content" tabindex="0"></div>
+
+<script src='//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js'></script>
+<script src="socket.io/socket.io.js"></script>
+<script>
+io = io.connect()
+
+io.emit('ready') 
+io.emit('liked_pages') 
+
+io.on('talk', function(data) {
+	if (typeof data.liked_pages !== 'undefined') {
+		//alert(data.liked_pages);
+		//$("#content").html(data.liked_pages);
+	}
+})
+
+</script>
+</body></html>
