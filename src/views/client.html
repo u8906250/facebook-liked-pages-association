@@ -1,22 +1,42 @@
 <!DOCTYPE html>
 <head><meta charset='UTF-8'>
 </head><body>
-
-
+<div id="head"></div>
 <div id="content" tabindex="0"></div>
 
 <script src='//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js'></script>
 <script src="socket.io/socket.io.js"></script>
 <script>
+var liked_pages_max_count = 3000;
+var liked_pages_top = 10;
+var liked_pages_start_name = "";
 io = io.connect()
 
 io.emit('ready') 
 io.emit('liked_pages') 
 
 io.on('talk', function(data) {
+	if (typeof data.liked_pages_max_count !== 'undefined') {
+		liked_pages_max_count = data.liked_pages_max_count;
+	}
+	if (typeof data.liked_pages_top !== 'undefined') {
+		liked_pages_top = data.liked_pages_top;
+	}
+	if (typeof data.liked_pages_start_name !== 'undefined') {
+		liked_pages_start_name = data.liked_pages_start_name;
+	}
+	if (typeof data.liked_pages_count !== 'undefined') {
+		$("#head").html('<p>TOP ' + liked_pages_top + ', start from ' + liked_pages_start_name + ', max count ' + liked_pages_max_count + ', '+ Math.round(data.liked_pages_count * 100 / liked_pages_max_count) + ' %</p>');
+		setTimeout(function(){
+			io.emit('liked_pages');
+		}, 1000);
+	}
 	if (typeof data.liked_pages !== 'undefined') {
-		//alert(data.liked_pages);
-		//$("#content").html(data.liked_pages);
+		$("#head").html('<p>TOP ' + liked_pages_top + ', start from ' + liked_pages_start_name + ', max count ' + liked_pages_max_count + "</p>");
+		for (i=0; i<data.liked_pages.length; i++) {
+			entry = data.liked_pages[i];
+			$("#content").append("<p>" + entry.id + " " + entry.name + " " + entry.count + "</p>");
+		}
 	}
 })
 

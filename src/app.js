@@ -2,6 +2,11 @@ var express = require('express.io');
 var graph = require('fbgraph');
 var conf = require("../config").facebook; //setup your own config.js
 var MAX_LIKED_PAGES = 65535;
+var MAX_LIKED_PAGES_GET = 10000;
+var MAX_LIKED_PAGES_TOP = 50;
+var LIKED_PAGES_START_NAME = "thinkTW";
+var liked_pages_get_count = 0;
+var liked_pages_sorted = 0;
 
 function liked_pages_bucket_get (start, end, liked_pages, id)
 {
@@ -16,29 +21,43 @@ function liked_pages_bucket_get (start, end, liked_pages, id)
 	return i;
 }
 
-function liked_pages_dump (liked_pages)
+function liked_pages_dump (liked_pages, max)
 {
-	for (i=0; i<MAX_LIKED_PAGES; i++) {
+	for (i=0; i<MAX_LIKED_PAGES && i<max; i++) {
 		if (typeof liked_pages[i] != "undefined"){
-			if (liked_pages[i].count > 10) {
-				console.log(i + " " + liked_pages[i].id + " " + liked_pages[i].name + " " + liked_pages[i].count);
-			}
+			console.log(i + " " + liked_pages[i].id + " " + liked_pages[i].name + " " + liked_pages[i].count);
 		}
 	}
 }
 
+function liked_pages_compare(a,b) {
+	if (a.count < b.count)
+		return 1;
+	if (a.count > b.count)
+		return -1;
+	return 0;
+}
+
 function liked_pages_get (liked_pages, name)
 {
+	if (liked_pages_get_count >= MAX_LIKED_PAGES_GET)
+		return;
+	liked_pages_get_count ++;
 	graph.get(name+"/likes", function(err, res) {
-		if (res && res.data) { 
-			res.data.forEach(function(entry) {
+		if (res && res.data) {
+			for (j=0; j<res.data.length; j++) {
+				if (liked_pages_get_count >= MAX_LIKED_PAGES_GET)
+					break;	
+				entry = res.data[j];
 				if (entry.id && entry.name) {
 					idx = liked_pages_bucket_get (entry.id%MAX_LIKED_PAGES, MAX_LIKED_PAGES, entry.id);
+
 					if (idx == MAX_LIKED_PAGES) {
 						idx = liked_pages_bucket_get (0, entry.id%MAX_LIKED_PAGES, entry.id);
 						if (idx  == entry.id%MAX_LIKED_PAGES) {
 							//FIXME out of buckets
-							return;
+							//console.log("out of buckets");
+							break;
 						}
 					}
 					if (typeof liked_pages[idx] == "undefined"){
@@ -48,7 +67,7 @@ function liked_pages_get (liked_pages, name)
 						liked_pages[idx].count ++;
 					}
 				}
-			});
+			}
 		}
 	});
 }
@@ -56,7 +75,7 @@ function liked_pages_get (liked_pages, name)
 //get your access token from https://developers.facebook.com/tools/explorer
 if (conf.access_token) {
 	graph.setAccessToken(conf.access_token);
-	var start_name = "thinkTW";
+	var start_name = LIKED_PAGES_START_NAME;
 	var liked_pages = new Array(MAX_LIKED_PAGES);
 	graph.get(start_name, function(err, res) {
 		if (res.id && res.name) {
@@ -68,17 +87,26 @@ if (conf.access_token) {
 }
 
 
+
+
 var app = express().http().io();
 
 app.use(express.cookieParser())
 app.use(express.session({secret: 'test123'}))
 
 app.io.route('ready', function(req) {
+	req.io.emit('talk', {liked_pages_max_count: MAX_LIKED_PAGES_GET, liked_pages_top: MAX_LIKED_PAGES_TOP, liked_pages_start_name: LIKED_PAGES_START_NAME});
 });
 
 app.io.route('liked_pages', function(req) {
-	liked_pages_dump(liked_pages);
-	//req.io.emit('talk', {liked_pages: liked_pages});
+	if (liked_pages_get_count < MAX_LIKED_PAGES_GET) {
+		req.io.emit('talk', {liked_pages_count: liked_pages_get_count});
+	} else {
+		if (!liked_pages_sorted) {
+			liked_pages.sort(liked_pages_compare);
+		}
+		req.io.emit('talk', {liked_pages: liked_pages.slice(0, MAX_LIKED_PAGES_TOP)});
+	}
 });
 
 app.get('/', function(req, res) {
